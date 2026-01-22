@@ -1,8 +1,8 @@
-# Log Analysis with Splunk
+# Log Analysis with Splunk using BOTS v3 Dataset
 
 ---
 
-## 📌 Project Objective
+## Project Objective
 
 The goal of this project was to learn **log analysis** using **Splunk** by analysing **Windows Security Event Logs**.
 
@@ -16,26 +16,9 @@ Rather than starting with predefined alerts, this project focuses on:
 
 ---
 
-## Background: Why Windows Security Logs?
+## Log Inventory – Understanding the Dataset
 
-Windows Security logs are one of the most critical data sources in a Security Operations Centre (SOC) because they record:
-
-- Authentication attempts (successful and failed)  
-- Process creation and termination  
-- Privileged activity  
-- Account and policy changes  
-
-Understanding these logs is essential for detecting:
-
-- Brute-force attacks  
-- Credential abuse  
-- Privilege escalation  
-- Lateral movement  
----
-
-## 🔹 Step 1: Log Inventory – Understanding the Dataset
-
-### Initial Question
+### Initial I wanted to understand
 
 **“What types of logs do I even have?”**
 
@@ -52,8 +35,6 @@ This helped me quickly understand what kinds of logs were available and which on
 ![Log Inventory by Sourcetype](https://github.com/Prajwal-Manjunath/Log-Analysis/blob/main/splunk_sourcetype.png)
 
 ### Why This Was Done
-
-### Outcome
 
 By running this query and reviewing the results, I learned what each log category in the dataset represented.  
 
@@ -73,11 +54,11 @@ From this, **Windows Security logs** were chosen as the first focus due to their
 
 ---
 
-## 🔹 Step 2: Scoping to Windows Security Logs
+## Scoping to Windows Security Logs
 
-### Question
+### Next i wanted to know 
 
-**“What does raw Windows Security log data look like?”**
+**“How does raw Windows Security log data look like?”**
 
 ### Query Used
 
@@ -102,9 +83,7 @@ This step helped me understand what kinds of security actions are recorded by Wi
 
 ---
 
-## 🔹 Step 3: Establishing Baseline Behaviour Using EventCodes
-
-### Question
+### Next i wanted to know
 
 **“What types of security actions occur most frequently?”**
 
@@ -115,11 +94,12 @@ index=botsv3 sourcetype=WinEventLog:Security
 | stats count by EventCode
 | sort -count
 ```
+![EventCodeWinSecLogs](https://github.com/Prajwal-Manjunath/Log-Analysis/blob/main/event_code_splunk.png)
+
 ### Query Explanation
 
 This query searches the BOTS v3 dataset and restricts the results to **Windows Security logs only**.  
 It then:
-
 - Groups events by Windows **EventCode**  
 - Counts how many times each EventCode appears  
 - Sorts the results in descending order to show the most frequent events first  
@@ -131,4 +111,64 @@ Specifically, it helped me understand:
 
 - Which security actions occur most often  
 - Which EventCodes are common and represent normal activity  
-- How frequently different types of security-related actions are recorded  
+- How frequently different types of security-related actions are recorded
+
+  ---
+
+##  Analysing Failed Logon Attempts (EventCode 4625)
+
+I wanted to analyse **failed login attempts** to check for potential **brute-force or credential abuse activity** by grouping failed logons by account and source IP.
+---
+
+### Initial Query Used
+
+```spl
+index=botsv3 sourcetype=WinEventLog:Security EventCode=4625
+| stats count by Account_Name, src_ip
+| sort -count
+```
+### Mistake Identified
+
+This query did not return the expected results because I assumed field names without verifying them first.  
+The fields `Account_Name` and `src_ip` do not exist for failed logon events in this dataset.
+
+This highlighted an important lesson:  
+**Field names should never be assumed and they must be confirmed by inspecting the raw event data.**
+
+---
+
+### Investigating the Raw Event
+
+To understand what fields were actually available, I inspected a single failed logon event using:
+
+```spl
+index=botsv3 sourcetype=WinEventLog:Security EventCode=4625
+| head 1
+```
+![RawEventFields](https://github.com/Prajwal-Manjunath/Log-Analysis/blob/main/fields_eventcode.png)
+
+### Fields Identified from the Event
+
+By reviewing the available fields, I learned the following:
+
+| Field Name        | Meaning                                   |
+|------------------|-------------------------------------------|
+| `Account_Name`   | The account involved in the login attempt |
+| `Account_Domain` | Domain the account belongs to             |
+| `Security_ID`    | SID of the account                        |
+
+
+### Corrected Query
+
+After identifying the correct field names, I updated my query to:
+```spl
+index=botsv3 sourcetype=WinEventLog:Security EventCode=4625
+| stats count by Account_Name, Source_Network_Address, Failure_Reason, Security_ID
+| sort -count
+```
+![4625_attempts](https://github.com/Prajwal-Manjunath/Log-Analysis/blob/main/failed_logon.png)
+### Outcome
+
+The dataset contained only 3 failed logon events (EventCode 4625).
+Based on this result, there was no evidence of brute-force activity in the dataset.
+
