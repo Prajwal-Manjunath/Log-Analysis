@@ -225,23 +225,27 @@ xmlkv parses XML key/value pairs into searchable fields, which allowed Splunk to
 
 ![EventIDSysmon](https://github.com/Prajwal-Manjunath/Log-Analysis/blob/main/sysmon_events.png)
 
-### Sysmon EventID Significance (What each code means)
+### Sysmon EventIDs 
 
-Below is what each Sysmon **EventID** represents (based on Sysmon’s event taxonomy) and why it matters during investigations:
+To make sense of the Sysmon results, I noted down what each Sysmon **EventID** means 
+Sysmon EventIDs basically describe *what kind of action happened on the machine*
 
-| EventID | What it records (Significance) | Why it matters / Example use |
-|-------:|----------------------------------|------------------------------|
-| **1**  | **Process Create** (a new process starts) | Detect suspicious execution (e.g., `powershell.exe`, `cmd.exe`, LOLBins), track parent/child process chains. |
-| **2**  | **File Creation Time Changed** | Can indicate **timestomping** (attackers modifying timestamps to hide activity). |
-| **3**  | **Network Connection** (outbound network connection from a process) | Identify **beaconing**, suspicious outbound traffic, unusual destinations/ports, and which process initiated it. |
-| **4**  | **Sysmon Service State Changed** | Alerts when Sysmon starts/stops—useful to detect **tampering** or defensive evasion attempts. |
-| **5**  | **Process Terminated** | Helps confirm process lifecycle (what ended, when), useful for correlating short-lived malware. |
-| **6**  | **Driver Loaded** | Detect suspicious kernel drivers / potential rootkit behaviour; useful for high-privilege persistence checks. |
-| **8**  | **CreateRemoteThread** | Strong signal for **process injection** techniques (e.g., one process injecting into another). |
-| **11** | **File Create** (a file was created/written) | Track malware drops, payload writes, suspicious file locations (e.g., temp folders, user profile paths). |
-| **12** | **Registry Key/Value Create/Delete** | Detect persistence attempts via registry (Run keys, services, policies). |
-| **13** | **Registry Value Set** (modification) | Detect registry-based persistence/config changes (e.g., changing an existing Run key value). |
-| **15** | **FileCreateStreamHash** (Alternate Data Stream + hashing) | Useful for detecting **ADS abuse** and tracking file content via hashes for threat hunting. |
+| EventID | Simple meaning | Why it matters |
+|-------:|-----------------|----------------|
+| **1**  | A program started running | Helps identify what was executed (e.g., `powershell.exe`, `cmd.exe`) and the parent process that launched it. |
+| **2**  | A file’s timestamp was changed | Can be a sign of **timestomping**, where attackers change file times to hide activity. |
+| **3**  | A program made a network connection | Shows which process connected to which IP/domain and port (useful for spotting suspicious outbound traffic). |
+| **4**  | Sysmon was started or stopped | Unexpected Sysmon stops can indicate possible tampering or attempts to reduce visibility. |
+| **5**  | A program stopped running | Helps track process lifecycle, especially short-lived processes. |
+| **6**  | A driver was loaded | Drivers run at a deep system level; suspicious drivers can indicate high-risk behaviour. |
+| **8**  | One process injected into another | Often linked to **process injection**, a common malware technique. |
+| **11** | A file was created | Useful for spotting malware drops or suspicious file writes. |
+| **12** | A registry key/value was created or deleted | Registry activity can indicate persistence (e.g., startup entries). |
+| **13** | A registry value was modified | Similar to 12, but specifically a change to an existing registry value. |
+| **15** | Alternate Data Stream (ADS) activity was detected | ADS can be used to hide data within files, sometimes used by attackers. |
+
+This helped me interpret the EventID frequency results and understand what types of Sysmon activity were most common in the dataset.
 
 
+### This is ongoing Learning Project. Will be updated as i learn things and pratice in splunk
 
