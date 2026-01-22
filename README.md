@@ -171,4 +171,77 @@ index=botsv3 sourcetype=WinEventLog:Security EventCode=4625
 
 The dataset contained only 3 failed logon events (EventCode 4625).
 Based on this result, there was no evidence of brute-force activity in the dataset.
+---
+
+## Sysmon Analysis (XmlWinEventLog:Microsoft-Windows-Sysmon/Operational)
+
+After working with Windows Security logs (which helped me understand **who logged in** or **who failed to log in**), I wanted to learn Sysmon because it shows **what actually ran on the machine** (process activity, network connections, file activity, etc.).
+
+---
+
+### Scoping to Sysmon Logs
+
+### Why I Did This
+
+I wanted to view all Sysmon telemetry being collected from the Windows host so I could inspect what the raw Sysmon events looked like.
+
+### Query Used
+
+```spl
+index="botsv3" sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+```
+
+### What I Learned
+
+This query helped me confirm that Sysmon logs were available in the dataset and allowed me to start exploring the raw event structure.
+
+---
+
+### Counting Sysmon Events by EventID
+
+I wanted to understand:
+
+- Which Sysmon EventIDs exist in the dataset  
+- Which EventIDs occur most frequently  
+- What types of activity Sysmon is recording the most  
+
+So I used this query:
+
+```spl
+index=botsv3 sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+| stats count by EventID
+| sort -count
+```
+It failed because Sysmon events are stored in XML format, and Splunk was not automatically parsing the XML fields into searchable key/value fields.
+
+Corrected Query
+```spl
+index=botsv3 sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+| xmlkv
+| stats count by EventID
+| sort -count
+```
+xmlkv parses XML key/value pairs into searchable fields, which allowed Splunk to correctly extract EventID and generate accurate counts.
+
+![EventIDSysmon](https://github.com/Prajwal-Manjunath/Log-Analysis/blob/main/sysmon_events.png)
+
+### Sysmon EventID Significance (What each code means)
+
+Below is what each Sysmon **EventID** represents (based on Sysmon’s event taxonomy) and why it matters during investigations:
+
+| EventID | What it records (Significance) | Why it matters / Example use |
+|-------:|----------------------------------|------------------------------|
+| **1**  | **Process Create** (a new process starts) | Detect suspicious execution (e.g., `powershell.exe`, `cmd.exe`, LOLBins), track parent/child process chains. |
+| **2**  | **File Creation Time Changed** | Can indicate **timestomping** (attackers modifying timestamps to hide activity). |
+| **3**  | **Network Connection** (outbound network connection from a process) | Identify **beaconing**, suspicious outbound traffic, unusual destinations/ports, and which process initiated it. |
+| **4**  | **Sysmon Service State Changed** | Alerts when Sysmon starts/stops—useful to detect **tampering** or defensive evasion attempts. |
+| **5**  | **Process Terminated** | Helps confirm process lifecycle (what ended, when), useful for correlating short-lived malware. |
+| **6**  | **Driver Loaded** | Detect suspicious kernel drivers / potential rootkit behaviour; useful for high-privilege persistence checks. |
+| **8**  | **CreateRemoteThread** | Strong signal for **process injection** techniques (e.g., one process injecting into another). |
+| **11** | **File Create** (a file was created/written) | Track malware drops, payload writes, suspicious file locations (e.g., temp folders, user profile paths). |
+| **12** | **Registry Key/Value Create/Delete** | Detect persistence attempts via registry (Run keys, services, policies). |
+| **13** | **Registry Value Set** (modification) | Detect registry-based persistence/config changes (e.g., changing an existing Run key value). |
+| **15** | **FileCreateStreamHash** (Alternate Data Stream + hashing) | Useful for detecting **ADS abuse** and tracking file content via hashes for threat hunting. |
+
+
 
